@@ -28,20 +28,21 @@ DATABASE_URL='postgres://windmill:password@127.0.0.1:5432/windmill' \
 uv run funmill start windmill
 ```
 
-Open <http://localhost:8001>, log in with `admin@windmill.dev` / `changeme`,
+Open <http://localhost:8813>, log in with `admin@windmill.dev` / `changeme`,
 change the password, and create an API token in the `admins` workspace. Then
 start Funmill in another terminal:
 
 ```bash
 FUNMILL_API_KEY='replace-me' \
-WINDMILL_URL='http://127.0.0.1:8001' \
+WINDMILL_URL='http://127.0.0.1:8813' \
 WINDMILL_WORKSPACE=admins \
 WINDMILL_TOKEN='replace-me' \
 uv run funmill start
 ```
 
-The API is at <http://localhost:8805>; OpenAPI docs are at
-<http://localhost:8805/docs>. All `/v1` routes require `X-API-Key`. See the
+The Funmill API port is fixed at `8812`; the active third-party UI/API port is
+fixed at `8813`. OpenAPI docs are at <http://localhost:8812/docs>. All `/v1`
+routes require `X-API-Key`. See the
 [Windmill deployment guide](src/funmill/backends/windmill/README.md) for
 PostgreSQL setup and additional workers.
 

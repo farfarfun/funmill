@@ -16,6 +16,7 @@ from funmill.models import (
     TaskSubmit,
     WorkflowSubmit,
 )
+from funmill.ports import THIRD_PARTY_WEB_PORT
 
 from ..base import BackendError, TaskBackend
 
@@ -90,7 +91,9 @@ class WindmillBackend(TaskBackend):
     @classmethod
     def from_env(cls) -> "WindmillBackend":
         return cls(
-            base_url=os.getenv("WINDMILL_URL", "http://127.0.0.1:8001"),
+            base_url=os.getenv(
+                "WINDMILL_URL", f"http://127.0.0.1:{THIRD_PARTY_WEB_PORT}"
+            ),
             workspace=os.getenv("WINDMILL_WORKSPACE", "admins"),
             token=os.getenv("WINDMILL_TOKEN", ""),
             timeout=float(os.getenv("WINDMILL_TIMEOUT", "30")),

@@ -7,6 +7,7 @@ from types import ModuleType
 import uvicorn
 
 from funmill.backends import BACKEND_SPECS
+from funmill.ports import FUNMILL_API_PORT
 
 
 def _service_names() -> list[str]:
@@ -51,7 +52,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             uvicorn.run(
                 "funmill.api:app",
                 host=os.getenv("FUNMILL_HOST", "127.0.0.1"),
-                port=int(os.getenv("FUNMILL_PORT", "8805")),
+                port=FUNMILL_API_PORT,
             )
         else:
             parser.print_help()

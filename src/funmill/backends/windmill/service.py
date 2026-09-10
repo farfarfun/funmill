@@ -6,6 +6,8 @@ import tempfile
 from pathlib import Path
 from urllib.request import Request, urlopen
 
+from funmill.ports import THIRD_PARTY_WEB_PORT
+
 VERSION = "v1.808.0"
 URL = f"https://github.com/windmill-labs/windmill/releases/download/{VERSION}/windmill-amd64"
 SHA256 = "ed48bfb9a391daa437f0c867376f009c7186855530de7fe2f58cf557ff1f7c3a"
@@ -70,7 +72,7 @@ def start() -> None:
     environment = os.environ.copy()
     mode = environment.setdefault("MODE", "standalone")
     if mode in {"standalone", "server"}:
-        environment.setdefault("PORT", "8001")
-        environment.setdefault("BASE_URL", "http://127.0.0.1:8001")
+        environment["PORT"] = str(THIRD_PARTY_WEB_PORT)
+        environment.setdefault("BASE_URL", f"http://127.0.0.1:{THIRD_PARTY_WEB_PORT}")
     environment.setdefault("SERVER_BIND_ADDR", "127.0.0.1")
     os.execve(executable, [str(executable)], environment)

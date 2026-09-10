@@ -35,13 +35,12 @@ postgres://windmill:数据库密码@127.0.0.1:5432/windmill
 ```bash
 DATABASE_URL='postgres://windmill:数据库密码@127.0.0.1:5432/windmill' \
 MODE=standalone \
-PORT=8001 \
-BASE_URL='http://127.0.0.1:8001' \
 SERVER_BIND_ADDR=127.0.0.1 \
 uv run funmill start windmill
 ```
 
-打开 <http://127.0.0.1:8001>，首次登录使用：
+Windmill 的 Web 界面和原生 API 固定使用 `8813`。打开
+<http://127.0.0.1:8813>，首次登录使用：
 
 ```text
 admin@windmill.dev / changeme
@@ -56,7 +55,7 @@ admin@windmill.dev / changeme
 ```bash
 FUNMILL_API_KEY='自行设置的接口密钥' \
 FUNMILL_BACKEND=windmill \
-WINDMILL_URL='http://127.0.0.1:8001' \
+WINDMILL_URL='http://127.0.0.1:8813' \
 WINDMILL_WORKSPACE=admins \
 WINDMILL_TOKEN='刚创建的Windmill-Token' \
 uv run funmill start
@@ -65,7 +64,7 @@ uv run funmill start
 验证：
 
 ```bash
-curl http://127.0.0.1:8805/health
+curl http://127.0.0.1:8812/health
 FUNMILL_API_KEY='自行设置的接口密钥' ./scripts/smoke.sh
 ```
 

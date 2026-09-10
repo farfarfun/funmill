@@ -195,6 +195,7 @@ def test_windmill_service_install_and_start(monkeypatch, tmp_path):
     )
     monkeypatch.setenv("FUNMILL_HOME", str(tmp_path))
     monkeypatch.setenv("DATABASE_URL", "postgres://windmill:test@localhost/windmill")
+    monkeypatch.setenv("PORT", "9999")
     monkeypatch.setattr(windmill_service.platform, "system", lambda: "Linux")
     monkeypatch.setattr(windmill_service.platform, "machine", lambda: "x86_64")
     monkeypatch.setattr(windmill_service, "SHA256", hashlib.sha256(binary).hexdigest())
@@ -217,7 +218,7 @@ def test_windmill_service_install_and_start(monkeypatch, tmp_path):
     windmill_service.start()
     assert called["path"] == executable
     assert called["env"]["MODE"] == "standalone"
-    assert called["env"]["PORT"] == "8001"
+    assert called["env"]["PORT"] == "8813"
 
     monkeypatch.setenv("MODE", "worker")
     monkeypatch.delenv("PORT", raising=False)
@@ -229,14 +230,14 @@ def test_windmill_default_url(monkeypatch):
     monkeypatch.delenv("WINDMILL_URL", raising=False)
     backend = WindmillBackend.from_env()
     try:
-        assert str(backend.client.base_url) == "http://127.0.0.1:8001/api/w/admins/"
+        assert str(backend.client.base_url) == "http://127.0.0.1:8813/api/w/admins/"
     finally:
         backend.close()
 
 
 def test_funmill_cli_uses_facade_port(monkeypatch):
     called = {}
-    monkeypatch.delenv("FUNMILL_PORT", raising=False)
+    monkeypatch.setenv("FUNMILL_PORT", "9999")
     monkeypatch.setattr(
         funmill_cli.uvicorn,
         "run",
@@ -246,7 +247,7 @@ def test_funmill_cli_uses_facade_port(monkeypatch):
     assert called == {
         "app": "funmill.api:app",
         "host": "127.0.0.1",
-        "port": 8805,
+        "port": 8812,
     }
 
 
