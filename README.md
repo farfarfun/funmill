@@ -24,9 +24,13 @@ uv run funmill install windmill
 Start Windmill against an existing PostgreSQL database:
 
 ```bash
-DATABASE_URL='postgres://windmill:password@127.0.0.1:5432/windmill' \
+vim ~/.farfarfun/funmill/windmill/.env
 uv run funmill start windmill
 ```
+
+Set `DATABASE_URL=postgresql://windmill:password@127.0.0.1:5432/windmill` in
+that file. The installer creates it with `0600` permissions and never
+overwrites an existing configuration.
 
 Open <http://localhost:8813>, log in with `admin@windmill.dev` / `changeme`,
 change the password, and create an API token in the `admins` workspace. Then

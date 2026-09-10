@@ -11,11 +11,51 @@ from funmill.ports import THIRD_PARTY_WEB_PORT
 VERSION = "v1.808.0"
 URL = f"https://github.com/windmill-labs/windmill/releases/download/{VERSION}/windmill-amd64"
 SHA256 = "ed48bfb9a391daa437f0c867376f009c7186855530de7fe2f58cf557ff1f7c3a"
+_ENV_TEMPLATE = """DATABASE_URL=
+MODE=standalone
+SERVER_BIND_ADDR=127.0.0.1
+"""
+
+
+def _home() -> Path:
+    return Path(os.getenv("FUNMILL_HOME", Path.home() / ".farfarfun" / "funmill"))
 
 
 def _target() -> Path:
-    home = Path(os.getenv("FUNMILL_HOME", Path.home() / ".farfarfun" / "funmill"))
-    return home / "services" / "windmill" / "windmill"
+    return _home() / "services" / "windmill" / "windmill"
+
+
+def _config_path() -> Path:
+    return _home() / "windmill" / ".env"
+
+
+def _ensure_config() -> Path:
+    path = _config_path()
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(_ENV_TEMPLATE, encoding="utf-8")
+        path.chmod(0o600)
+        print(f"created config: {path}")
+    return path
+
+
+def _read_config(path: Path) -> dict[str, str]:
+    values = {}
+    for line_number, raw_line in enumerate(
+        path.read_text(encoding="utf-8").splitlines(), 1
+    ):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, separator, value = line.partition("=")
+        key = key.strip()
+        if not separator or not key.isidentifier():
+            raise RuntimeError(f"invalid config at {path}:{line_number}")
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        values[key] = value
+    return values
 
 
 def _sha256(path: Path) -> str:
@@ -31,6 +71,7 @@ def install(force: bool = False) -> Path:
         raise RuntimeError("Windmill v1.808.0 installer only supports Linux x86_64")
 
     target = _target()
+    _ensure_config()
     if target.exists() and _sha256(target) == SHA256:
         return target
     if target.exists() and not force:
@@ -66,10 +107,12 @@ def start() -> None:
             )
         executable = Path(system_executable)
 
-    if not os.getenv("DATABASE_URL"):
-        raise RuntimeError("DATABASE_URL is required")
+    config = _ensure_config()
+    environment = _read_config(config)
+    environment.update(os.environ)
+    if not environment.get("DATABASE_URL"):
+        raise RuntimeError(f"DATABASE_URL is required; edit {config}")
 
-    environment = os.environ.copy()
     mode = environment.setdefault("MODE", "standalone")
     if mode in {"standalone", "server"}:
         environment["PORT"] = str(THIRD_PARTY_WEB_PORT)

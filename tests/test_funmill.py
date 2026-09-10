@@ -193,8 +193,11 @@ def test_windmill_service_install_and_start(monkeypatch, tmp_path):
     assert windmill_service._target() == (
         Path.home() / ".farfarfun" / "funmill" / "services" / "windmill" / "windmill"
     )
+    assert windmill_service._config_path() == (
+        Path.home() / ".farfarfun" / "funmill" / "windmill" / ".env"
+    )
     monkeypatch.setenv("FUNMILL_HOME", str(tmp_path))
-    monkeypatch.setenv("DATABASE_URL", "postgres://windmill:test@localhost/windmill")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("PORT", "9999")
     monkeypatch.setattr(windmill_service.platform, "system", lambda: "Linux")
     monkeypatch.setattr(windmill_service.platform, "machine", lambda: "x86_64")
@@ -208,6 +211,15 @@ def test_windmill_service_install_and_start(monkeypatch, tmp_path):
     executable = windmill_service.install()
     assert executable.read_bytes() == binary
     assert executable.stat().st_mode & 0o111
+    config = tmp_path / "windmill" / ".env"
+    assert config.stat().st_mode & 0o777 == 0o600
+    config.write_text(
+        "DATABASE_URL='postgres://windmill:test@localhost/windmill'\nMODE=standalone\n",
+        encoding="utf-8",
+    )
+    configured = config.read_text(encoding="utf-8")
+    windmill_service.install()
+    assert config.read_text(encoding="utf-8") == configured
 
     called = {}
     monkeypatch.setattr(
@@ -218,6 +230,9 @@ def test_windmill_service_install_and_start(monkeypatch, tmp_path):
     windmill_service.start()
     assert called["path"] == executable
     assert called["env"]["MODE"] == "standalone"
+    assert called["env"]["DATABASE_URL"] == (
+        "postgres://windmill:test@localhost/windmill"
+    )
     assert called["env"]["PORT"] == "8813"
 
     monkeypatch.setenv("MODE", "worker")

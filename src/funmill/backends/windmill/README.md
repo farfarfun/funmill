@@ -10,8 +10,9 @@ uv sync
 uv run funmill install windmill
 ```
 
-Windmill 会安装到 `~/.farfarfun/funmill/services/windmill/`。安装器会校验
-官方发行包的 SHA-256；设置 `FUNMILL_HOME` 可以修改安装目录。
+Windmill 会安装到 `~/.farfarfun/funmill/services/windmill/`，配置文件会创建为
+`~/.farfarfun/funmill/windmill/.env`。安装器会校验官方发行包的 SHA-256；设置
+`FUNMILL_HOME` 可以同时修改安装和配置根目录。
 
 ## 2. 准备数据库
 
@@ -22,20 +23,21 @@ sudo -u postgres createuser --pwprompt windmill
 sudo -u postgres createdb --owner=windmill windmill
 ```
 
-然后确认下面的连接可以使用：
+编辑 `~/.farfarfun/funmill/windmill/.env`，写入连接地址：
 
-```text
-postgres://windmill:数据库密码@127.0.0.1:5432/windmill
+```dotenv
+DATABASE_URL=postgresql://windmill:数据库密码@127.0.0.1:5432/windmill
+MODE=standalone
+SERVER_BIND_ADDR=127.0.0.1
 ```
+
+安装器首次创建该文件时会设置 `0600` 权限，且不会覆盖已有配置。
 
 ## 3. 启动 Windmill
 
 `standalone` 模式会在一个进程中同时运行 Server 和一个 Worker：
 
 ```bash
-DATABASE_URL='postgres://windmill:数据库密码@127.0.0.1:5432/windmill' \
-MODE=standalone \
-SERVER_BIND_ADDR=127.0.0.1 \
 uv run funmill start windmill
 ```
 
@@ -74,10 +76,7 @@ FUNMILL_API_KEY='自行设置的接口密钥' ./scripts/smoke.sh
 `WORKER_SUFFIX`：
 
 ```bash
-DATABASE_URL='postgres://windmill:数据库密码@127.0.0.1:5432/windmill' \
 MODE=worker WORKER_SUFFIX=worker2 uv run funmill start windmill
-
-DATABASE_URL='postgres://windmill:数据库密码@127.0.0.1:5432/windmill' \
 MODE=worker WORKER_SUFFIX=worker3 uv run funmill start windmill
 ```
 
