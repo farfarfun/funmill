@@ -26,7 +26,7 @@ def _target() -> Path:
 
 
 def _config_path() -> Path:
-    return _home() / "windmill" / ".env"
+    return _target().parent / ".env"
 
 
 def _ensure_config() -> Path:

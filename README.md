@@ -24,7 +24,7 @@ uv run funmill install windmill
 Start Windmill against an existing PostgreSQL database:
 
 ```bash
-vim ~/.farfarfun/funmill/windmill/.env
+vim ~/.farfarfun/funmill/services/windmill/.env
 uv run funmill start windmill
 ```
 

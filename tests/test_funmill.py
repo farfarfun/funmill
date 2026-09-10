@@ -194,7 +194,7 @@ def test_windmill_service_install_and_start(monkeypatch, tmp_path):
         Path.home() / ".farfarfun" / "funmill" / "services" / "windmill" / "windmill"
     )
     assert windmill_service._config_path() == (
-        Path.home() / ".farfarfun" / "funmill" / "windmill" / ".env"
+        Path.home() / ".farfarfun" / "funmill" / "services" / "windmill" / ".env"
     )
     monkeypatch.setenv("FUNMILL_HOME", str(tmp_path))
     monkeypatch.delenv("DATABASE_URL", raising=False)
@@ -211,7 +211,7 @@ def test_windmill_service_install_and_start(monkeypatch, tmp_path):
     executable = windmill_service.install()
     assert executable.read_bytes() == binary
     assert executable.stat().st_mode & 0o111
-    config = tmp_path / "windmill" / ".env"
+    config = tmp_path / "services" / "windmill" / ".env"
     assert config.stat().st_mode & 0o777 == 0o600
     config.write_text(
         "DATABASE_URL='postgres://windmill:test@localhost/windmill'\nMODE=standalone\n",

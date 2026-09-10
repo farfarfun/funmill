@@ -10,9 +10,10 @@ uv sync
 uv run funmill install windmill
 ```
 
-Windmill 会安装到 `~/.farfarfun/funmill/services/windmill/`，配置文件会创建为
-`~/.farfarfun/funmill/windmill/.env`。安装器会校验官方发行包的 SHA-256；设置
-`FUNMILL_HOME` 可以同时修改安装和配置根目录。
+Windmill 的二进制和配置文件都会放在
+`~/.farfarfun/funmill/services/windmill/`。安装器会校验官方发行包的
+SHA-256；设置 `FUNMILL_HOME` 可以修改 Funmill 的数据根目录。其他第三方服务
+同样使用 `~/.farfarfun/funmill/services/<service>/` 目录。
 
 ## 2. 准备数据库
 
@@ -23,7 +24,7 @@ sudo -u postgres createuser --pwprompt windmill
 sudo -u postgres createdb --owner=windmill windmill
 ```
 
-编辑 `~/.farfarfun/funmill/windmill/.env`，写入连接地址：
+编辑 `~/.farfarfun/funmill/services/windmill/.env`，写入连接地址：
 
 ```dotenv
 DATABASE_URL=postgresql://windmill:数据库密码@127.0.0.1:5432/windmill
