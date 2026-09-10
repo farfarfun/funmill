@@ -70,7 +70,7 @@ def start() -> None:
     environment = os.environ.copy()
     mode = environment.setdefault("MODE", "standalone")
     if mode in {"standalone", "server"}:
-        environment.setdefault("PORT", "8805")
-        environment.setdefault("BASE_URL", "http://127.0.0.1:8805")
+        environment.setdefault("PORT", "8001")
+        environment.setdefault("BASE_URL", "http://127.0.0.1:8001")
     environment.setdefault("SERVER_BIND_ADDR", "127.0.0.1")
     os.execve(executable, [str(executable)], environment)

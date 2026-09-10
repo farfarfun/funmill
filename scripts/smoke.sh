@@ -6,7 +6,7 @@ set -euo pipefail
 command -v curl >/dev/null || { printf 'curl is required\n' >&2; exit 1; }
 command -v jq >/dev/null || { printf 'jq is required\n' >&2; exit 1; }
 
-base_url="${FUNMILL_URL:-http://localhost:8000}"
+base_url="${FUNMILL_URL:-http://localhost:8805}"
 api_url="${base_url%/}/v1"
 callback_url="${FUNMILL_CALLBACK_URL:-}"
 smoke_timeout="${FUNMILL_SMOKE_TIMEOUT:-120}"

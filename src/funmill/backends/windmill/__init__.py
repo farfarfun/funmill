@@ -90,7 +90,7 @@ class WindmillBackend(TaskBackend):
     @classmethod
     def from_env(cls) -> "WindmillBackend":
         return cls(
-            base_url=os.getenv("WINDMILL_URL", "http://127.0.0.1:8805"),
+            base_url=os.getenv("WINDMILL_URL", "http://127.0.0.1:8001"),
             workspace=os.getenv("WINDMILL_WORKSPACE", "admins"),
             token=os.getenv("WINDMILL_TOKEN", ""),
             timeout=float(os.getenv("WINDMILL_TIMEOUT", "30")),

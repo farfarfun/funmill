@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+import funmill.cli as funmill_cli
 from funmill.api import app, backend_dependency
 from funmill.backends.base import TaskBackend
 from funmill.backends.windmill import WindmillBackend
@@ -216,7 +217,7 @@ def test_windmill_service_install_and_start(monkeypatch, tmp_path):
     windmill_service.start()
     assert called["path"] == executable
     assert called["env"]["MODE"] == "standalone"
-    assert called["env"]["PORT"] == "8805"
+    assert called["env"]["PORT"] == "8001"
 
     monkeypatch.setenv("MODE", "worker")
     monkeypatch.delenv("PORT", raising=False)
@@ -224,13 +225,29 @@ def test_windmill_service_install_and_start(monkeypatch, tmp_path):
     assert "PORT" not in called["env"]
 
 
-def test_windmill_default_url_uses_third_party_port(monkeypatch):
+def test_windmill_default_url(monkeypatch):
     monkeypatch.delenv("WINDMILL_URL", raising=False)
     backend = WindmillBackend.from_env()
     try:
-        assert str(backend.client.base_url) == "http://127.0.0.1:8805/api/w/admins/"
+        assert str(backend.client.base_url) == "http://127.0.0.1:8001/api/w/admins/"
     finally:
         backend.close()
+
+
+def test_funmill_cli_uses_facade_port(monkeypatch):
+    called = {}
+    monkeypatch.delenv("FUNMILL_PORT", raising=False)
+    monkeypatch.setattr(
+        funmill_cli.uvicorn,
+        "run",
+        lambda app, **kwargs: called.update(app=app, **kwargs),
+    )
+    funmill_cli.main(["start"])
+    assert called == {
+        "app": "funmill.api:app",
+        "host": "127.0.0.1",
+        "port": 8805,
+    }
 
 
 class FakeBackend(TaskBackend):

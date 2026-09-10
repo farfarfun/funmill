@@ -51,7 +51,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             uvicorn.run(
                 "funmill.api:app",
                 host=os.getenv("FUNMILL_HOST", "127.0.0.1"),
-                port=int(os.getenv("FUNMILL_PORT", "8000")),
+                port=int(os.getenv("FUNMILL_PORT", "8805")),
             )
         else:
             parser.print_help()
