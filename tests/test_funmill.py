@@ -216,12 +216,21 @@ def test_windmill_service_install_and_start(monkeypatch, tmp_path):
     windmill_service.start()
     assert called["path"] == executable
     assert called["env"]["MODE"] == "standalone"
-    assert called["env"]["PORT"] == "8001"
+    assert called["env"]["PORT"] == "8805"
 
     monkeypatch.setenv("MODE", "worker")
     monkeypatch.delenv("PORT", raising=False)
     windmill_service.start()
     assert "PORT" not in called["env"]
+
+
+def test_windmill_default_url_uses_third_party_port(monkeypatch):
+    monkeypatch.delenv("WINDMILL_URL", raising=False)
+    backend = WindmillBackend.from_env()
+    try:
+        assert str(backend.client.base_url) == "http://127.0.0.1:8805/api/w/admins/"
+    finally:
+        backend.close()
 
 
 class FakeBackend(TaskBackend):
