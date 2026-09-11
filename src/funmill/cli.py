@@ -1,13 +1,12 @@
 import argparse
 import importlib
-import os
 from collections.abc import Sequence
 from types import ModuleType
 
 import uvicorn
 
 from funmill.backends import BACKEND_SPECS
-from funmill.ports import FUNMILL_API_PORT
+from funmill.ports import FUNMILL_API_PORT, SERVICE_BIND_HOST
 
 
 def _service_names() -> list[str]:
@@ -33,6 +32,17 @@ def _parser() -> argparse.ArgumentParser:
     start.add_argument(
         "service", nargs="?", choices=["api", *_service_names()], default="api"
     )
+
+    for command in ("stop", "status", "restart"):
+        service_command = commands.add_parser(
+            command,
+            help={
+                "stop": "停止第三方服务",
+                "status": "查看第三方服务状态",
+                "restart": "重启第三方服务",
+            }[command],
+        )
+        service_command.add_argument("service", choices=_service_names())
     return parser
 
 
@@ -48,10 +58,19 @@ def main(argv: Sequence[str] | None = None) -> None:
             print(f"installed {args.service}: {path}")
         elif args.command == "start" and args.service != "api":
             _service(args.service).start()
+        elif args.command == "stop":
+            _service(args.service).stop()
+        elif args.command == "status":
+            if not _service(args.service).status():
+                raise SystemExit(1)
+        elif args.command == "restart":
+            service = _service(args.service)
+            service.stop()
+            service.start()
         elif args.command == "start":
             uvicorn.run(
                 "funmill.api:app",
-                host=os.getenv("FUNMILL_HOST", "127.0.0.1"),
+                host=SERVICE_BIND_HOST,
                 port=FUNMILL_API_PORT,
             )
         else:

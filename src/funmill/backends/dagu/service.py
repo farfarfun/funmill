@@ -7,7 +7,9 @@ import tempfile
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-from funmill.ports import THIRD_PARTY_WEB_PORT
+from funmill.ports import SERVICE_BIND_HOST, THIRD_PARTY_WEB_PORT
+
+from ..service import start_background, status_background, stop_background
 
 VERSION = "v2.16.3"
 _RELEASE = f"https://github.com/dagucloud/dagu/releases/download/{VERSION}"
@@ -112,23 +114,36 @@ def start() -> None:
 
     environment = os.environ.copy()
     environment.setdefault("DAGU_AUTH_MODE", "none")
-    environment["DAGU_HOME"] = str(executable.parent / "data")
+    service_directory = _target().parent
+    environment["DAGU_HOME"] = str(service_directory / "data")
+    environment.setdefault("DAGU_COORDINATOR_ENABLED", "false")
     environment.setdefault(
         "FUNMILL_DAGU_URL", f"http://127.0.0.1:{THIRD_PARTY_WEB_PORT}/api/v1"
     )
     if environment.get("DAGU_TOKEN"):
         environment.setdefault("FUNMILL_DAGU_TOKEN", environment["DAGU_TOKEN"])
-    os.execve(
-        executable,
+    start_background(
+        "dagu",
         [
             str(executable),
             "start-all",
             "--dagu-home",
-            str(executable.parent / "data"),
+            str(service_directory / "data"),
             "--host",
-            "127.0.0.1",
+            SERVICE_BIND_HOST,
             "--port",
             str(THIRD_PARTY_WEB_PORT),
+            "--coordinator.host",
+            SERVICE_BIND_HOST,
         ],
         environment,
+        service_directory,
     )
+
+
+def stop() -> None:
+    stop_background("dagu", _target().parent)
+
+
+def status() -> bool:
+    return status_background("dagu", _target().parent)

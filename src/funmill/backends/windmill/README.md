@@ -29,10 +29,11 @@ sudo -u postgres createdb --owner=windmill windmill
 ```dotenv
 DATABASE_URL=postgresql://windmill:数据库密码@127.0.0.1:5432/windmill
 MODE=standalone
-SERVER_BIND_ADDR=127.0.0.1
+SERVER_BIND_ADDR=0.0.0.0
 ```
 
 安装器首次创建该文件时会设置 `0600` 权限，且不会覆盖已有配置。
+Funmill 启动 Windmill 时会固定使用 `SERVER_BIND_ADDR=0.0.0.0`。
 
 ## 3. 启动 Windmill
 
@@ -42,7 +43,9 @@ SERVER_BIND_ADDR=127.0.0.1
 uv run funmill start windmill
 ```
 
-Windmill 的 Web 界面和原生 API 固定使用 `8813`。打开
+该命令会在后台启动 Windmill，并打印 PID 和日志路径。PID 与日志分别保存在
+`~/.farfarfun/funmill/services/windmill/windmill.pid` 和 `windmill.log`。
+Windmill 的 Web 界面和原生 API 固定监听 `0.0.0.0:8813`。本机打开
 <http://127.0.0.1:8813>，首次登录使用：
 
 ```text
@@ -64,12 +67,26 @@ WINDMILL_TOKEN='刚创建的Windmill-Token' \
 uv run funmill start
 ```
 
+Funmill API 固定监听 `0.0.0.0:8812`，并保持前台运行。
+
 验证：
 
 ```bash
 curl http://127.0.0.1:8812/health
 FUNMILL_API_KEY='自行设置的接口密钥' ./scripts/smoke.sh
 ```
+
+## 5. 管理后台服务
+
+```bash
+uv run funmill status windmill
+uv run funmill restart windmill
+uv run funmill stop windmill
+tail -f ~/.farfarfun/funmill/services/windmill/windmill.log
+```
+
+重复启动会被 PID 文件拦截。`stop` 会向 Windmill 的独立进程组发送 `SIGTERM`，
+等待正常退出后删除 PID 文件；服务异常退出后，`status` 会清理失效 PID。
 
 ## 增加 Worker
 
@@ -81,6 +98,15 @@ MODE=worker WORKER_SUFFIX=worker2 uv run funmill start windmill
 MODE=worker WORKER_SUFFIX=worker3 uv run funmill start windmill
 ```
 
-正式长期运行时，将上述命令交给现有的 systemd 或进程管理器即可。不要在
+每个 Worker 使用 `windmill-<WORKER_SUFFIX>.pid` 和同名日志。查询或停止某个
+Worker 时需要传入相同环境变量，例如：
+
+```bash
+MODE=worker WORKER_SUFFIX=worker2 uv run funmill status windmill
+MODE=worker WORKER_SUFFIX=worker2 uv run funmill stop windmill
+```
+
+需要开机启动、自动重启和日志轮转时，使用现有的 systemd 或进程管理器直接
+管理已安装的 Windmill 二进制。不要在
 一个普通 Worker 进程中设置 `NUM_WORKERS>1`；Windmill 会因为隔离安全限制将
 它回退为 1，多个独立 Worker 进程更明确。

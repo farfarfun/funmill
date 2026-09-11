@@ -1,19 +1,22 @@
 import hashlib
 import os
 import platform
+import re
 import shutil
 import tempfile
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-from funmill.ports import THIRD_PARTY_WEB_PORT
+from funmill.ports import SERVICE_BIND_HOST, THIRD_PARTY_WEB_PORT
+
+from ..service import start_background, status_background, stop_background
 
 VERSION = "v1.808.0"
 URL = f"https://github.com/windmill-labs/windmill/releases/download/{VERSION}/windmill-amd64"
 SHA256 = "ed48bfb9a391daa437f0c867376f009c7186855530de7fe2f58cf557ff1f7c3a"
-_ENV_TEMPLATE = """DATABASE_URL=
+_ENV_TEMPLATE = f"""DATABASE_URL=
 MODE=standalone
-SERVER_BIND_ADDR=127.0.0.1
+SERVER_BIND_ADDR={SERVICE_BIND_HOST}
 """
 
 
@@ -63,6 +66,22 @@ def _sha256(path: Path) -> str:
         return hashlib.file_digest(file, "sha256").hexdigest()
 
 
+def _environment() -> dict[str, str]:
+    path = _config_path()
+    environment = _read_config(path) if path.exists() else {}
+    environment.update(os.environ)
+    return environment
+
+
+def _instance_name(environment: dict[str, str]) -> str:
+    if environment.get("MODE", "standalone") != "worker":
+        return "windmill"
+    suffix = environment.get("WORKER_SUFFIX", "worker")
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", suffix):
+        raise RuntimeError("WORKER_SUFFIX must contain only letters, numbers, _ or -")
+    return f"windmill-{suffix}"
+
+
 def install(force: bool = False) -> Path:
     if platform.system() != "Linux" or platform.machine().lower() not in {
         "x86_64",
@@ -108,8 +127,7 @@ def start() -> None:
         executable = Path(system_executable)
 
     config = _ensure_config()
-    environment = _read_config(config)
-    environment.update(os.environ)
+    environment = _environment()
     if not environment.get("DATABASE_URL"):
         raise RuntimeError(f"DATABASE_URL is required; edit {config}")
 
@@ -117,5 +135,17 @@ def start() -> None:
     if mode in {"standalone", "server"}:
         environment["PORT"] = str(THIRD_PARTY_WEB_PORT)
         environment.setdefault("BASE_URL", f"http://127.0.0.1:{THIRD_PARTY_WEB_PORT}")
-    environment.setdefault("SERVER_BIND_ADDR", "127.0.0.1")
-    os.execve(executable, [str(executable)], environment)
+    environment["SERVER_BIND_ADDR"] = SERVICE_BIND_HOST
+    start_background(
+        _instance_name(environment), [str(executable)], environment, _target().parent
+    )
+
+
+def stop() -> None:
+    environment = _environment()
+    stop_background(_instance_name(environment), _target().parent)
+
+
+def status() -> bool:
+    environment = _environment()
+    return status_background(_instance_name(environment), _target().parent)

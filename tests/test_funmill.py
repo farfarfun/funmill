@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 import funmill.cli as funmill_cli
 from funmill.api import app, backend_dependency
+from funmill.backends import service as backend_service
 from funmill.backends.base import TaskBackend
 from funmill.backends.dagu import DaguBackend
 from funmill.backends.dagu import service as dagu_service
@@ -216,6 +217,7 @@ def test_windmill_service_install_and_start(monkeypatch, tmp_path):
     assert executable.stat().st_mode & 0o111
     config = tmp_path / "services" / "windmill" / ".env"
     assert config.stat().st_mode & 0o777 == 0o600
+    assert "SERVER_BIND_ADDR=0.0.0.0" in config.read_text(encoding="utf-8")
     config.write_text(
         "DATABASE_URL='postgres://windmill:test@localhost/windmill'\nMODE=standalone\n",
         encoding="utf-8",
@@ -226,21 +228,28 @@ def test_windmill_service_install_and_start(monkeypatch, tmp_path):
 
     called = {}
     monkeypatch.setattr(
-        windmill_service.os,
-        "execve",
-        lambda path, argv, env: called.update(path=path, argv=argv, env=env),
+        windmill_service,
+        "start_background",
+        lambda name, argv, env, directory: called.update(
+            name=name, argv=argv, env=env, directory=directory
+        ),
     )
     windmill_service.start()
-    assert called["path"] == executable
+    assert called["name"] == "windmill"
+    assert called["argv"] == [str(executable)]
+    assert called["directory"] == executable.parent
     assert called["env"]["MODE"] == "standalone"
     assert called["env"]["DATABASE_URL"] == (
         "postgres://windmill:test@localhost/windmill"
     )
     assert called["env"]["PORT"] == "8813"
+    assert called["env"]["SERVER_BIND_ADDR"] == "0.0.0.0"
 
     monkeypatch.setenv("MODE", "worker")
+    monkeypatch.setenv("WORKER_SUFFIX", "worker2")
     monkeypatch.delenv("PORT", raising=False)
     windmill_service.start()
+    assert called["name"] == "windmill-worker2"
     assert "PORT" not in called["env"]
 
 
@@ -365,16 +374,96 @@ def test_dagu_service_installs_macos_binary_and_starts(monkeypatch, tmp_path):
 
     called = {}
     monkeypatch.setattr(
-        dagu_service.os,
-        "execve",
-        lambda path, argv, env: called.update(path=path, argv=argv, env=env),
+        dagu_service,
+        "start_background",
+        lambda name, argv, env, directory: called.update(
+            name=name, argv=argv, env=env, directory=directory
+        ),
     )
     dagu_service.start()
-    assert called["path"] == executable
-    assert called["argv"][-2:] == ["--port", "8813"]
+    assert called["name"] == "dagu"
+    assert called["directory"] == executable.parent
+    assert called["argv"][called["argv"].index("--host") + 1] == "0.0.0.0"
+    assert called["argv"][called["argv"].index("--port") + 1] == "8813"
+    assert called["argv"][called["argv"].index("--coordinator.host") + 1] == "0.0.0.0"
     assert called["env"]["DAGU_AUTH_MODE"] == "none"
     assert called["env"]["DAGU_HOME"] == str(executable.parent / "data")
+    assert called["env"]["DAGU_COORDINATOR_ENABLED"] == "false"
     assert called["env"]["FUNMILL_DAGU_TOKEN"] == "secret"
+
+    executable.unlink()
+    monkeypatch.setattr(
+        dagu_service.shutil, "which", lambda _name: "/usr/local/bin/dagu"
+    )
+    dagu_service.start()
+    dagu_home = tmp_path / "services" / "dagu" / "data"
+    assert called["argv"][called["argv"].index("--dagu-home") + 1] == str(dagu_home)
+    assert called["env"]["DAGU_HOME"] == str(dagu_home)
+
+
+def test_third_party_service_starts_in_background(monkeypatch, tmp_path, capsys):
+    called = {}
+
+    class Process:
+        pid = 123
+
+        @staticmethod
+        def wait(timeout):
+            raise backend_service.subprocess.TimeoutExpired("demo", timeout)
+
+    def popen(command, **kwargs):
+        called.update(command=command, **kwargs)
+        return Process()
+
+    monkeypatch.setattr(backend_service.subprocess, "Popen", popen)
+    backend_service.start_background("demo", ["/tmp/demo"], {"KEY": "value"}, tmp_path)
+
+    assert called["command"] == ["/tmp/demo"]
+    assert called["env"] == {"KEY": "value"}
+    assert called["stdin"] is backend_service.subprocess.DEVNULL
+    assert called["stderr"] is backend_service.subprocess.STDOUT
+    assert called["start_new_session"] is True
+    assert Path(called["stdout"].name) == tmp_path / "demo.log"
+    assert called["stdout"].closed
+    assert (tmp_path / "demo.pid").read_text(encoding="utf-8") == "123\n"
+    assert "pid=123" in capsys.readouterr().out
+
+    monkeypatch.setattr(backend_service, "_is_running", lambda _pid: True)
+    with pytest.raises(RuntimeError, match="already running"):
+        backend_service.start_background(
+            "demo", ["/tmp/demo"], {"KEY": "value"}, tmp_path
+        )
+    assert backend_service.status_background("demo", tmp_path)
+
+    running = iter([True, False])
+    monkeypatch.setattr(backend_service, "_is_running", lambda _pid: next(running))
+    monkeypatch.setattr(backend_service.os, "getpgid", lambda pid: pid)
+    monkeypatch.setattr(
+        backend_service.os,
+        "killpg",
+        lambda group_id, sig: called.update(group_id=group_id, signal=sig),
+    )
+    backend_service.stop_background("demo", tmp_path)
+    assert called["group_id"] == 123
+    assert called["signal"] is backend_service.signal.SIGTERM
+    assert not (tmp_path / "demo.pid").exists()
+
+
+def test_third_party_service_reports_startup_failure(monkeypatch, tmp_path):
+    class Process:
+        pid = 456
+
+        @staticmethod
+        def wait(timeout):
+            return 2
+
+    monkeypatch.setattr(
+        backend_service.subprocess, "Popen", lambda *_args, **_kwargs: Process()
+    )
+
+    with pytest.raises(RuntimeError, match="exited during startup with code 2"):
+        backend_service.start_background("demo", ["/tmp/demo"], {}, tmp_path)
+    assert not (tmp_path / "demo.pid").exists()
 
 
 def test_funmill_cli_uses_facade_port(monkeypatch):
@@ -388,9 +477,38 @@ def test_funmill_cli_uses_facade_port(monkeypatch):
     funmill_cli.main(["start"])
     assert called == {
         "app": "funmill.api:app",
-        "host": "127.0.0.1",
+        "host": "0.0.0.0",
         "port": 8812,
     }
+
+
+def test_funmill_cli_manages_third_party_service(monkeypatch):
+    calls = []
+
+    class Service:
+        @staticmethod
+        def start():
+            calls.append("start")
+
+        @staticmethod
+        def stop():
+            calls.append("stop")
+
+        @staticmethod
+        def status():
+            calls.append("status")
+            return True
+
+    monkeypatch.setattr(funmill_cli, "_service", lambda _name: Service)
+    funmill_cli.main(["status", "dagu"])
+    funmill_cli.main(["stop", "dagu"])
+    funmill_cli.main(["restart", "dagu"])
+    assert calls == ["status", "stop", "stop", "start"]
+
+    Service.status = staticmethod(lambda: False)
+    with pytest.raises(SystemExit) as stopped:
+        funmill_cli.main(["status", "dagu"])
+    assert stopped.value.code == 1
 
 
 class FakeBackend(TaskBackend):

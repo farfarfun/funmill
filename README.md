@@ -23,14 +23,15 @@ uv sync
 uv run funmill install dagu
 ```
 
-Start Dagu. It stores state under
+Start Dagu in the background. It stores state under
 `~/.farfarfun/funmill/services/dagu/data/` and needs no external database:
 
 ```bash
 uv run funmill start dagu
 ```
 
-Open <http://localhost:8813>, then start Funmill in another terminal:
+The command reports its PID and log path. Open <http://localhost:8813>, then
+start Funmill:
 
 ```bash
 FUNMILL_API_KEY='replace-me' \
@@ -39,9 +40,14 @@ DAGU_URL='http://127.0.0.1:8813' \
 uv run funmill start
 ```
 
-Local Dagu binds to loopback without authentication. If Dagu authentication is
-enabled, set `DAGU_TOKEN` for both `funmill start dagu` and `funmill start` so
-cross-run dependencies can query Dagu from worker processes.
+Managed HTTP services bind to `0.0.0.0`: Funmill uses port `8812` and the active
+third-party service uses `8813`. Local client URLs still use `127.0.0.1` or
+`localhost`; `0.0.0.0` is a listen address, not a client destination.
+
+Dagu starts without authentication. Because it listens on every interface,
+restrict port `8813` with a firewall or enable Dagu authentication. When
+authentication is enabled, set `DAGU_TOKEN` for both `funmill start dagu` and
+`funmill start` so cross-run dependencies can query Dagu from worker processes.
 
 Dagu runs submitted source with the service user's host permissions. Keep both
 services private and accept only trusted code; use isolated workers or
@@ -50,8 +56,9 @@ containers before accepting untrusted jobs.
 The Funmill API port is fixed at `8812`; the active third-party UI/API port is
 fixed at `8813`. OpenAPI docs are at <http://localhost:8812/docs>. All `/v1`
 routes require `X-API-Key`. See the
-[Windmill deployment guide](src/funmill/backends/windmill/README.md) when using
-the optional Windmill backend.
+[Dagu deployment guide](src/funmill/backends/dagu/README.md) or the
+[Windmill deployment guide](src/funmill/backends/windmill/README.md) for
+backend-specific setup.
 
 Run the end-to-end task and DAG checks with:
 
@@ -122,6 +129,15 @@ selection uses `FUNMILL_BACKEND`; registration lives in
 `fundrive`. Each third-party adapter lives in its own directory, such as
 `src/funmill/backends/windmill/`.
 
+Every third-party adapter directory must include a `README.md` covering its
+supported platforms, installation, configuration, startup, verification, and
+security or operational constraints.
+
+Every managed HTTP service must bind to `SERVICE_BIND_HOST` (`0.0.0.0`). Every
+third-party service must use the shared background lifecycle in
+`src/funmill/backends/service.py` and expose `start`, `stop`, and `status`;
+`restart` is composed from `stop` and `start` by the CLI.
+
 Changing the backend does not change `/v1`, but it does not migrate old jobs or
 their IDs. Add a Funmill-owned ID mapping database only when jobs must remain
 queryable after a live backend migration.
@@ -132,12 +148,17 @@ queryable after a live backend migration.
 funmill services
 funmill install dagu
 funmill start dagu
+funmill status dagu
+funmill restart dagu
+funmill stop dagu
 funmill install windmill
 funmill start windmill
 funmill start
 ```
 
-Both start commands run in the foreground and stop normally with `Ctrl+C`.
-Use systemd or an existing process manager for long-running deployment. Add
-TLS, PostgreSQL backups, callback egress restrictions, and a secrets manager
-before network exposure.
+Third-party services run in the background with PID and log files under
+`~/.farfarfun/funmill/services/<service>/`; replace `dagu` with `windmill` in
+the lifecycle commands as needed. The Funmill API remains in the foreground and
+stops with `Ctrl+C`. Add authentication, TLS, firewall rules, PostgreSQL
+backups, callback egress restrictions, and a secrets manager before network
+exposure.
