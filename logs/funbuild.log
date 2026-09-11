@@ -1,17 +1,4 @@
-2026-09-10 17:28:27.395 |INFO    | funbuild.core.base : base: 187 | funbuild | - funmill build
-2026-09-10 17:28:27.395 |INFO    | funbuild.core.base : base: 128 | funbuild | - funmill pull
-2026-09-10 17:28:27.865 |INFO    | funbuild.core.uv_build : uv_build: 213 | funbuild | - public server: pypi
-2026-09-10 17:28:30.381 |INFO    | funbuild.core.base : base: 161 | funbuild | - funmill push
-2026-09-10 22:52:00.333 |INFO    | funbuild.core.base : base: 187 | funbuild | - funmill build
-2026-09-10 22:52:00.334 |INFO    | funbuild.core.base : base: 128 | funbuild | - funmill pull
-2026-09-10 22:52:00.769 |INFO    | funbuild.core.uv_build : uv_build: 213 | funbuild | - public server: pypi
-2026-09-10 22:52:03.022 |INFO    | funbuild.core.base : base: 161 | funbuild | - funmill push
-2026-09-10 22:53:35.039 |INFO    | funbuild.core.base : base: 182 | funbuild | - funmill install
-2026-09-10 23:18:29.187 |INFO    | funbuild.core.base : base: 187 | funbuild | - funmill build
-2026-09-10 23:18:29.187 |INFO    | funbuild.core.base : base: 128 | funbuild | - funmill pull
-2026-09-10 23:18:29.813 |INFO    | funbuild.core.uv_build : uv_build: 213 | funbuild | - public server: pypi
-2026-09-10 23:18:32.410 |INFO    | funbuild.core.base : base: 161 | funbuild | - funmill push
-2026-09-10 23:24:50.624 |INFO    | funbuild.core.base : base: 187 | funbuild | - funmill build
-2026-09-10 23:24:50.624 |INFO    | funbuild.core.base : base: 128 | funbuild | - funmill pull
-2026-09-10 23:24:51.109 |INFO    | funbuild.core.uv_build : uv_build: 213 | funbuild | - public server: pypi
-2026-09-10 23:24:53.706 |INFO    | funbuild.core.base : base: 161 | funbuild | - funmill push
+2026-09-11 15:28:31.239 |INFO    | funbuild.core.base : base: 187 | funbuild | - funmill build
+2026-09-11 15:28:31.241 |INFO    | funbuild.core.base : base: 128 | funbuild | - funmill pull
+2026-09-11 15:28:31.703 |INFO    | funbuild.core.uv_build : uv_build: 213 | funbuild | - public server: pypi
+2026-09-11 15:28:34.038 |INFO    | funbuild.core.base : base: 161 | funbuild | - funmill push

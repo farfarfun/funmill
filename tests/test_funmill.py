@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import tarfile
 from pathlib import Path
 
 import httpx
@@ -11,6 +12,8 @@ from pydantic import ValidationError
 import funmill.cli as funmill_cli
 from funmill.api import app, backend_dependency
 from funmill.backends.base import TaskBackend
+from funmill.backends.dagu import DaguBackend
+from funmill.backends.dagu import service as dagu_service
 from funmill.backends.windmill import WindmillBackend
 from funmill.backends.windmill import service as windmill_service
 from funmill.models import (
@@ -248,6 +251,130 @@ def test_windmill_default_url(monkeypatch):
         assert str(backend.client.base_url) == "http://127.0.0.1:8813/api/w/admins/"
     finally:
         backend.close()
+
+
+def test_dagu_translates_inline_dag_and_lifecycle():
+    requests = []
+    output_requests = 0
+
+    def handler(request: httpx.Request):
+        nonlocal output_requests
+        requests.append(request)
+        path = request.url.path
+        if request.method == "POST" and path.endswith("/dag-runs"):
+            return httpx.Response(200, json={"dagRunId": JOB_ID})
+        if path.endswith(f"/{JOB_ID}/outputs"):
+            output_requests += 1
+            if output_requests == 1:
+                return httpx.Response(200, json={"metadata": {}, "outputs": {}})
+            return httpx.Response(
+                200,
+                json={
+                    "metadata": {"status": "succeeded"},
+                    "outputs": {"result": '{"a":"json:1","c":"text:3"}'},
+                },
+            )
+        if path.endswith(f"/{JOB_ID}/reschedule"):
+            return httpx.Response(200, json={"dagRunId": RERUN_ID})
+        if path.endswith("/log"):
+            stream = request.url.params.get("stream")
+            return httpx.Response(
+                200, json={"content": "A finished" if stream == "stdout" else ""}
+            )
+        if request.method == "GET":
+            return httpx.Response(
+                200,
+                json={
+                    "dagRunDetails": {
+                        "statusLabel": "succeeded",
+                        "startedAt": "2026-09-10T00:00:01Z",
+                        "finishedAt": "2026-09-10T00:00:02Z",
+                        "nodes": [
+                            {
+                                "statusLabel": "succeeded",
+                                "step": {"id": "a", "name": "a"},
+                            }
+                        ],
+                    }
+                },
+            )
+        return httpx.Response(200)
+
+    client = httpx.Client(
+        base_url="http://dagu/api/v1/", transport=httpx.MockTransport(handler)
+    )
+    backend = DaguBackend("http://unused", client=client)
+    task_id = backend.submit_workflow(
+        workflow(
+            depends_on=[RERUN_ID],
+            callback_url="https://example.test/callback",
+        )
+    )
+    body = json.loads(requests[0].content)
+    spec = json.loads(body["spec"])
+
+    assert task_id == JOB_ID
+    assert spec["name"] == "funmill"
+    assert spec["steps"][0]["id"] == "funmill_wait"
+    assert spec["steps"][1]["depends"] == ["funmill_wait"]
+    compile(spec["steps"][1]["run"], "<dagu-test>", "exec")
+    assert spec["steps"][2]["depends"] == ["a"]
+    assert spec["steps"][-2]["action"] == "outputs.write"
+    assert spec["steps"][-1]["depends"] == ["funmill_result"]
+    assert set(spec["handler_on"]) == {"failure", "abort"}
+    assert backend.get_task(JOB_ID).status == TaskStatus.SUCCEEDED
+    assert backend.get_progress(JOB_ID).progress == 100
+    assert backend.get_logs(JOB_ID).logs == "[a stdout]\nA finished"
+    assert backend.get_result(JOB_ID).result == {"a": 1, "c": "3"}
+    backend.cancel(JOB_ID, "stop")
+    assert backend.rerun(JOB_ID) == RERUN_ID
+
+
+def test_dagu_service_installs_macos_binary_and_starts(monkeypatch, tmp_path):
+    binary = b"dagu-test-binary"
+    archive_file = io.BytesIO()
+    with tarfile.open(fileobj=archive_file, mode="w:gz") as archive:
+        member = tarfile.TarInfo("dagu")
+        member.size = len(binary)
+        archive.addfile(member, io.BytesIO(binary))
+    archive = archive_file.getvalue()
+
+    monkeypatch.setenv("FUNMILL_HOME", str(tmp_path))
+    monkeypatch.setenv("DAGU_TOKEN", "secret")
+    monkeypatch.delenv("FUNMILL_DAGU_TOKEN", raising=False)
+    monkeypatch.setattr(dagu_service.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(dagu_service.platform, "machine", lambda: "arm64")
+    monkeypatch.setattr(
+        dagu_service,
+        "_BUILDS",
+        {
+            ("darwin", "arm64"): (
+                "darwin_arm64",
+                hashlib.sha256(archive).hexdigest(),
+                hashlib.sha256(binary).hexdigest(),
+            )
+        },
+    )
+    monkeypatch.setattr(
+        dagu_service, "urlopen", lambda *_args, **_kwargs: io.BytesIO(archive)
+    )
+
+    executable = dagu_service.install()
+    assert executable.read_bytes() == binary
+    assert executable.stat().st_mode & 0o111
+
+    called = {}
+    monkeypatch.setattr(
+        dagu_service.os,
+        "execve",
+        lambda path, argv, env: called.update(path=path, argv=argv, env=env),
+    )
+    dagu_service.start()
+    assert called["path"] == executable
+    assert called["argv"][-2:] == ["--port", "8813"]
+    assert called["env"]["DAGU_AUTH_MODE"] == "none"
+    assert called["env"]["DAGU_HOME"] == str(executable.parent / "data")
+    assert called["env"]["FUNMILL_DAGU_TOKEN"] == "secret"
 
 
 def test_funmill_cli_uses_facade_port(monkeypatch):

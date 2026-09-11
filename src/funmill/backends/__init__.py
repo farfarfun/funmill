@@ -12,6 +12,7 @@ class BackendSpec(NamedTuple):
 
 
 BACKEND_SPECS = {
+    "dagu": BackendSpec(".dagu", "DaguBackend", ".dagu.service"),
     "windmill": BackendSpec(".windmill", "WindmillBackend", ".windmill.service"),
 }
 

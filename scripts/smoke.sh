@@ -57,7 +57,7 @@ wait_for() {
 task_payload="$(jq -n --arg callback_url "$callback_url" '
 {
   language: "python",
-  source: "import time\nfrom wmill import set_progress\n\ndef main(name: str = \"Funmill\"):\n    for progress in (25, 50, 75, 99):\n        print(f\"progress={progress}\")\n        set_progress(progress)\n        time.sleep(0.2)\n    return {\"message\": f\"hello {name}\"}\n",
+  source: "import time\n\ndef main(name: str = \"Funmill\"):\n    for progress in (25, 50, 75, 99):\n        print(f\"progress={progress}\")\n        time.sleep(0.2)\n    return {\"message\": f\"hello {name}\"}\n",
   args: {name: "Funmill"},
   retry: {attempts: 2, delay_seconds: 1},
   callback_url: (if $callback_url == "" then null else $callback_url end)
